@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile Picture Frame Generator</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 20px; background: #f0f2f5; }
+        #canvas-container { margin: 20px auto; max-width: 500px; display: none; }
+        canvas { width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .btn { background: #1877f2; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; margin: 10px; }
+        .btn:hover { background: #166fe5; }
+    </style>
+</head>
+<body>
+
+    <h1>Create Your Framed Profile Picture</h1>
+    <p>Upload your photo to apply our custom Facebook frame!</p>
+    
+    <input type="file" id="upload" accept="image/*">
+    
+    <div id="canvas-container">
+        <canvas id="canvas" width="1500" height="1500"></canvas>
+        <br>
+        <button class="btn" id="download-btn">Download Framed Photo</button>
+    </div>
+
+    <script>
+        const upload = document.getElementById('upload');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('canvas-container');
+        const downloadBtn = document.getElementById('download-btn');
+
+        // Path to your transparent frame PNG hosted in this repository
+        const FRAME_SRC = 'frame.png'; 
+
+        let userImage = new Image();
+        let frameImage = new Image();
+        frameImage.src = FRAME_SRC;
+
+        upload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                userImage.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        userImage.onload = () => {
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 1. Draw User Image (scaled to cover the 1500x1500 square)
+            let minDim = Math.min(userImage.width, userImage.height);
+            let sx = (userImage.width - minDim) / 2;
+            let sy = (userImage.height - minDim) / 2;
+            ctx.drawImage(userImage, sx, sy, minDim, minDim, 0, 0, canvas.width, canvas.height);
+            
+            // 2. Overlay the Frame
+            ctx.drawImage(frameImage, 0, 0, canvas.width, canvas.height);
+            
+            container.style.display = 'block';
+        };
+
+        downloadBtn.addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = 'framed-profile-pic.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        });
+    </script>
+</body>
+</html>
