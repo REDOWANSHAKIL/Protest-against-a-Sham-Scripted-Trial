@@ -82,7 +82,7 @@
 
     <div class="container">
         <h1>Interactive Profile Frame Studio</h1>
-        <p>Upload your personal photo and use the sliders to align it perfectly inside the frame.</p>
+        <p>Upload your personal photo and use the sliders to align it perfectly inside the center gap.</p>
 
         <div class="upload-section">
             <label class="step-label" for="user-upload">Upload Your Profile Photo</label>
@@ -93,15 +93,15 @@
             <h3>Adjust Photo Position</h3>
             <div class="control-group">
                 <label for="zoom">Zoom Size:</label>
-                <input type="range" id="zoom" min="0.5" max="3" step="0.01" value="1.1">
+                <input type="range" id="zoom" min="0.2" max="4" step="0.01" value="1.0">
             </div>
             <div class="control-group">
                 <label for="offsetX">Move Left/Right:</label>
-                <input type="range" id="offsetX" min="-300" max="300" step="1" value="0">
+                <input type="range" id="offsetX" min="-800" max="800" step="1" value="0">
             </div>
             <div class="control-group">
                 <label for="offsetY">Move Up/Down:</label>
-                <input type="range" id="offsetY" min="-300" max="300" step="1" value="0">
+                <input type="range" id="offsetY" min="-800" max="800" step="1" value="0">
             </div>
         </div>
         
@@ -120,12 +120,10 @@
         const controlsPanel = document.getElementById('controls');
         const downloadBtn = document.getElementById('download-btn');
 
-        // Target Sliders
         const zoomSlider = document.getElementById('zoom');
         const offsetXSlider = document.getElementById('offsetX');
         const offsetYSlider = document.getElementById('offsetY');
 
-        // IMPORTANT: Make sure your frame image file matches this exact filename case on GitHub
         const FRAME_SRC = 'frame.png'; 
 
         let userImage = new Image();
@@ -134,7 +132,6 @@
         let userLoaded = false;
         let frameLoaded = false;
 
-        // Auto-load repository frame asset immediately when page boots
         frameImage.crossOrigin = "anonymous";
         frameImage.src = FRAME_SRC;
         frameImage.onload = () => {
@@ -142,9 +139,8 @@
             if (userLoaded) initCanvasSettings();
         };
 
-        // User uploads profile photo
         userUpload.addEventListener('change', (e) => {
-            const file = e.target.files[0];
+            const file = e.target.files;
             if (!file) return;
             const reader = new FileReader();
             reader.onload = (event) => {
@@ -160,22 +156,19 @@
         function initCanvasSettings() {
             if (!userLoaded || !frameLoaded) return;
             
-            // Lock canvas limits to match template size
             canvas.width = frameImage.width;
             canvas.height = frameImage.height;
 
-            // Dynamically assign slider movement ranges based on the template size
-            offsetXSlider.min = -canvas.width / 2;
-            offsetXSlider.max = canvas.width / 2;
-            offsetYSlider.min = -canvas.height / 2;
-            offsetYSlider.max = canvas.height / 2;
+            offsetXSlider.min = -canvas.width;
+            offsetXSlider.max = canvas.width;
+            offsetYSlider.min = -canvas.height;
+            offsetYSlider.max = canvas.height;
 
             controlsPanel.style.display = 'block';
             container.style.display = 'block';
             renderCanvas();
         }
 
-        // Live updating canvas listeners
         [zoomSlider, offsetXSlider, offsetYSlider].forEach(slider => {
             slider.addEventListener('input', renderCanvas);
         });
@@ -185,10 +178,10 @@
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // Mathematical center coordinate mappings for your frame layout
-            const circleX = canvas.width * 0.4573;
-            const circleY = canvas.height * 0.5013;
-            const radius = canvas.width * 0.2373; 
+            // NEW RECALIBRATED COORDINATES: Targets the exact center opening above the text
+            const circleX = canvas.width * 0.315; 
+            const circleY = canvas.height * 0.507; 
+            const radius = canvas.width * 0.237; 
 
             const scale = parseFloat(zoomSlider.value);
             const moveX = parseInt(offsetXSlider.value);
@@ -197,7 +190,7 @@
             let minDim = Math.min(userImage.width, userImage.height);
             let targetSize = radius * 2 * scale;
             
-            // Layer 1: Crop and mask user face inside the target window area
+            // Draw profile picture inside the masked central circle
             ctx.save();
             ctx.beginPath();
             ctx.arc(circleX, circleY, radius, 0, Math.PI * 2);
@@ -209,7 +202,7 @@
             ctx.drawImage(userImage, (userImage.width - minDim)/2, (userImage.height - minDim)/2, minDim, minDim, drawX, drawY, targetSize, targetSize);
             ctx.restore();
             
-            // Layer 2: Strip out the fake white circle background grid from your graphic file
+            // Mask out the inner grid pattern from the frame layer completely
             let offscreenCanvas = document.createElement('canvas');
             offscreenCanvas.width = canvas.width;
             offscreenCanvas.height = canvas.height;
@@ -221,7 +214,7 @@
             offCtx.arc(circleX, circleY, radius - 4, 0, Math.PI * 2); 
             offCtx.fill();
             
-            // Layer 3: Render processed template layer cleanly on top
+            // Apply frame strictly on top of user image
             ctx.drawImage(offscreenCanvas, 0, 0, canvas.width, canvas.height);
         }
 
