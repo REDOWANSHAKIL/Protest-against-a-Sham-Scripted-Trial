@@ -80,7 +80,7 @@
         frameImage.src = FRAME_SRC;
 
         upload.addEventListener('change', (e) => {
-            const file = e.target.files[0];
+            const file = e.target.files;
             if (!file) return;
 
             const reader = new FileReader();
@@ -99,37 +99,36 @@
             let sx = (userImage.width - minDim) / 2;
             let sy = (userImage.height - minDim) / 2;
             
-            // 3. Draw the user photo centered inside the specific frame circle dimensions
-            // Circle parameters calculated to fit the cutout window perfectly
-            const circleX = 672;
-            const circleY = 792;
-            const radius = 350;
+            // RECALIBRATED COORDINATES: Centers the photo cleanly inside your frame
+            const circleX = 686;
+            const circleY = 752;
+            const radius = 356; 
             
+            // 3. Draw the user photo centered inside the mask
             ctx.save();
             ctx.beginPath();
-            ctx.arc(circleX, circleY, radius, 0, Math.PI * 2);
+            ctx.arc(circleX, circleY, radius - 4, 0, Math.PI * 2);
             ctx.clip();
             
-            // Draw the user photo cleanly cropped into a circle shape
+            // Draw the user photo scaled perfectly inside the window
             ctx.drawImage(userImage, sx, sy, minDim, minDim, circleX - radius, circleY - radius, radius * 2, radius * 2);
             ctx.restore();
             
-            // 4. Create a dynamic masking layer to cut a physical hole in the white frame template
+            // 4. Create an offscreen layer to punch a clean opening in your frame template
             let offscreenCanvas = document.createElement('canvas');
             offscreenCanvas.width = canvas.width;
             offscreenCanvas.height = canvas.height;
             let offCtx = offscreenCanvas.getContext('2d');
             
-            // Draw frame template onto background calculation layer
             offCtx.drawImage(frameImage, 0, 0, canvas.width, canvas.height);
             
-            // Clear out the white block circle to create a completely transparent viewport
+            // Clear out the white block circle from the original asset
             offCtx.globalCompositeOperation = 'destination-out';
             offCtx.beginPath();
-            offCtx.arc(circleX, circleY, radius - 5, 0, Math.PI * 2); 
+            offCtx.arc(circleX, circleY, radius - 8, 0, Math.PI * 2); 
             offCtx.fill();
             
-            // 5. Draw the final corrected transparency frame directly on top of the user picture
+            // 5. Draw the finalized frame overlay back on top of the user picture
             ctx.drawImage(offscreenCanvas, 0, 0, canvas.width, canvas.height);
             
             container.style.display = 'block';
