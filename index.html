@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Profile Picture Frame Generator</title>
+    <title>Interactive Profile Picture Frame Generator</title>
     <style>
         body { 
             font-family: sans-serif; 
@@ -18,6 +18,34 @@
             padding: 30px;
             border-radius: 12px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .upload-section {
+            margin: 15px 0;
+            padding: 15px;
+            background: #fdfdfd;
+            border: 1px dashed #ccc;
+            border-radius: 6px;
+        }
+        .control-panel {
+            margin: 20px 0;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+        .control-group {
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .control-group label {
+            font-weight: bold;
+            width: 30%;
+            text-align: left;
+        }
+        .control-group input {
+            width: 65%;
         }
         #canvas-container { 
             margin: 20px auto; 
@@ -43,97 +71,159 @@
         .btn:hover { 
             background: #166fe5; 
         }
-        input[type="file"] {
-            margin: 20px 0;
+        label.step-label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
         }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h1>Create Your Framed Profile Picture</h1>
-        <p>Upload your personal photo to apply the custom profile frame automatically!</p>
-        
-        <input type="file" id="upload" accept="image/*">
+        <h1>Interactive Profile Frame Studio</h1>
+        <p>Upload your personal photo and use the sliders to align it perfectly inside the frame.</p>
+
+        <div class="upload-section">
+            <label class="step-label" for="user-upload">Upload Your Profile Photo</label>
+            <input type="file" id="user-upload" accept="image/*">
+        </div>
+
+        <div class="control-panel" id="controls">
+            <h3>Adjust Photo Position</h3>
+            <div class="control-group">
+                <label for="zoom">Zoom Size:</label>
+                <input type="range" id="zoom" min="0.5" max="3" step="0.01" value="1.1">
+            </div>
+            <div class="control-group">
+                <label for="offsetX">Move Left/Right:</label>
+                <input type="range" id="offsetX" min="-300" max="300" step="1" value="0">
+            </div>
+            <div class="control-group">
+                <label for="offsetY">Move Up/Down:</label>
+                <input type="range" id="offsetY" min="-300" max="300" step="1" value="0">
+            </div>
+        </div>
         
         <div id="canvas-container">
-            <canvas id="canvas" width="1500" height="1500"></canvas>
+            <canvas id="canvas"></canvas>
             <br>
             <button class="btn" id="download-btn">Download Framed Photo</button>
         </div>
     </div>
 
     <script>
-        const upload = document.getElementById('upload');
+        const userUpload = document.getElementById('user-upload');
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         const container = document.getElementById('canvas-container');
+        const controlsPanel = document.getElementById('controls');
         const downloadBtn = document.getElementById('download-btn');
 
-        // IMPORTANT: Change this to match your EXACT filename case on GitHub
+        // Target Sliders
+        const zoomSlider = document.getElementById('zoom');
+        const offsetXSlider = document.getElementById('offsetX');
+        const offsetYSlider = document.getElementById('offsetY');
+
+        // IMPORTANT: Make sure your frame image file matches this exact filename case on GitHub
         const FRAME_SRC = 'frame.png'; 
 
         let userImage = new Image();
         let frameImage = new Image();
-        
+
+        let userLoaded = false;
+        let frameLoaded = false;
+
+        // Auto-load repository frame asset immediately when page boots
         frameImage.crossOrigin = "anonymous";
         frameImage.src = FRAME_SRC;
+        frameImage.onload = () => {
+            frameLoaded = true;
+            if (userLoaded) initCanvasSettings();
+        };
 
-        upload.addEventListener('change', (e) => {
+        // User uploads profile photo
+        userUpload.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
-
             const reader = new FileReader();
             reader.onload = (event) => {
+                userImage.onload = () => {
+                    userLoaded = true;
+                    initCanvasSettings();
+                };
                 userImage.src = event.target.result;
             };
             reader.readAsDataURL(file);
         });
 
-        userImage.onload = () => {
-            // 1. Reset and wipe canvas clean
+        function initCanvasSettings() {
+            if (!userLoaded || !frameLoaded) return;
+            
+            // Lock canvas limits to match template size
+            canvas.width = frameImage.width;
+            canvas.height = frameImage.height;
+
+            // Dynamically assign slider movement ranges based on the template size
+            offsetXSlider.min = -canvas.width / 2;
+            offsetXSlider.max = canvas.width / 2;
+            offsetYSlider.min = -canvas.height / 2;
+            offsetYSlider.max = canvas.height / 2;
+
+            controlsPanel.style.display = 'block';
+            container.style.display = 'block';
+            renderCanvas();
+        }
+
+        // Live updating canvas listeners
+        [zoomSlider, offsetXSlider, offsetYSlider].forEach(slider => {
+            slider.addEventListener('input', renderCanvas);
+        });
+
+        function renderCanvas() {
+            if (!userLoaded || !frameLoaded) return;
+
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // 2. Prepare user image measurements to scale into a square crop
+            // Mathematical center coordinate mappings for your frame layout
+            const circleX = canvas.width * 0.4573;
+            const circleY = canvas.height * 0.5013;
+            const radius = canvas.width * 0.2373; 
+
+            const scale = parseFloat(zoomSlider.value);
+            const moveX = parseInt(offsetXSlider.value);
+            const moveY = parseInt(offsetYSlider.value);
+            
             let minDim = Math.min(userImage.width, userImage.height);
-            let sx = (userImage.width - minDim) / 2;
-            let sy = (userImage.height - minDim) / 2;
+            let targetSize = radius * 2 * scale;
             
-            // 3. Draw the user photo centered inside the specific frame circle dimensions
-            // Circle parameters calculated to fit the cutout window perfectly
-            const circleX = 672;
-            const circleY = 792;
-            const radius = 350;
-            
+            // Layer 1: Crop and mask user face inside the target window area
             ctx.save();
             ctx.beginPath();
             ctx.arc(circleX, circleY, radius, 0, Math.PI * 2);
             ctx.clip();
             
-            // Draw the user photo cleanly cropped into a circle shape
-            ctx.drawImage(userImage, sx, sy, minDim, minDim, circleX - radius, circleY - radius, radius * 2, radius * 2);
+            let drawX = circleX - (targetSize / 2) + moveX;
+            let drawY = circleY - (targetSize / 2) + moveY;
+            
+            ctx.drawImage(userImage, (userImage.width - minDim)/2, (userImage.height - minDim)/2, minDim, minDim, drawX, drawY, targetSize, targetSize);
             ctx.restore();
             
-            // 4. Create a dynamic masking layer to cut a physical hole in the white frame template
+            // Layer 2: Strip out the fake white circle background grid from your graphic file
             let offscreenCanvas = document.createElement('canvas');
             offscreenCanvas.width = canvas.width;
             offscreenCanvas.height = canvas.height;
             let offCtx = offscreenCanvas.getContext('2d');
             
-            // Draw frame template onto background calculation layer
             offCtx.drawImage(frameImage, 0, 0, canvas.width, canvas.height);
-            
-            // Clear out the white block circle to create a completely transparent viewport
             offCtx.globalCompositeOperation = 'destination-out';
             offCtx.beginPath();
-            offCtx.arc(circleX, circleY, radius - 5, 0, Math.PI * 2); 
+            offCtx.arc(circleX, circleY, radius - 4, 0, Math.PI * 2); 
             offCtx.fill();
             
-            // 5. Draw the final corrected transparency frame directly on top of the user picture
+            // Layer 3: Render processed template layer cleanly on top
             ctx.drawImage(offscreenCanvas, 0, 0, canvas.width, canvas.height);
-            
-            container.style.display = 'block';
-        };
+        }
 
         downloadBtn.addEventListener('click', () => {
             const link = document.createElement('a');
