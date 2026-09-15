@@ -74,7 +74,7 @@
         </div>
         
         <div id="canvas-container">
-            <canvas id="canvas" width="1500" height="1500"></canvas>
+            <canvas id="canvas"></canvas>
             <br>
             <button class="btn" id="download-btn">Download Framed Photo</button>
         </div>
@@ -94,7 +94,6 @@
         let userLoaded = false;
         let frameLoaded = false;
 
-        // Load Frame Image manually or automatically via fallback
         frameUpload.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
@@ -109,7 +108,6 @@
             reader.readAsDataURL(file);
         });
 
-        // Load User Profile Picture
         userUpload.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
@@ -125,31 +123,33 @@
         });
 
         function renderCanvas() {
-            // Only draw if both images are fully processing in memory
             if (!userLoaded || !frameLoaded) return;
 
-            // 1. Clear previous drawings
+            // DYNAMIC FIX: Match canvas size perfectly to your uploaded frame's dimensions
+            canvas.width = frameImage.width;
+            canvas.height = frameImage.height;
+
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // 2. Exact center coordinates and radius for the target opening
-            const circleX = 686;
-            const circleY = 752;
-            const radius = 356; 
+            // AUTOMATIC CENTER CALCULATION based on your exact layout proportions
+            const circleX = canvas.width * 0.4573;
+            const circleY = canvas.height * 0.5013;
+            const radius = canvas.width * 0.2373; 
             
-            // 3. Size calculations for square crop matching
+            // Handle profile picture scaling to fit beautifully into a square crop
             let minDim = Math.min(userImage.width, userImage.height);
             let sx = (userImage.width - minDim) / 2;
             let sy = (userImage.height - minDim) / 2;
             
-            // 4. Crop and paint user photo into the circular space
+            // Draw profile picture inside the circular boundary mask
             ctx.save();
             ctx.beginPath();
-            ctx.arc(circleX, circleY, radius - 4, 0, Math.PI * 2);
+            ctx.arc(circleX, circleY, radius, 0, Math.PI * 2);
             ctx.clip();
             ctx.drawImage(userImage, sx, sy, minDim, minDim, circleX - radius, circleY - radius, radius * 2, radius * 2);
             ctx.restore();
             
-            // 5. Create an offscreen layer to safely clip your white background template
+            // Create an overlay layer to knock out the white mask on the template
             let offscreenCanvas = document.createElement('canvas');
             offscreenCanvas.width = canvas.width;
             offscreenCanvas.height = canvas.height;
@@ -157,13 +157,13 @@
             
             offCtx.drawImage(frameImage, 0, 0, canvas.width, canvas.height);
             
-            // Clear out the white block circle from the frame graphic
+            // Clear out the white block circle from the original asset
             offCtx.globalCompositeOperation = 'destination-out';
             offCtx.beginPath();
-            offCtx.arc(circleX, circleY, radius - 8, 0, Math.PI * 2); 
+            offCtx.arc(circleX, circleY, radius - 4, 0, Math.PI * 2); 
             offCtx.fill();
             
-            // 6. Draw finalized overlay back on top
+            // Draw the cut-out frame over the profile photo
             ctx.drawImage(offscreenCanvas, 0, 0, canvas.width, canvas.height);
             
             container.style.display = 'block';
