@@ -32,11 +32,14 @@
         const container = document.getElementById('canvas-container');
         const downloadBtn = document.getElementById('download-btn');
 
-        // Path to your transparent frame PNG hosted in this repository
+        // IMPORTANT: Change this to match your EXACT filename case on GitHub
         const FRAME_SRC = 'frame.png'; 
 
         let userImage = new Image();
         let frameImage = new Image();
+        
+        // Handle potential local cross-origin issues
+        frameImage.crossOrigin = "anonymous";
         frameImage.src = FRAME_SRC;
 
         upload.addEventListener('change', (e) => {
@@ -50,17 +53,18 @@
             reader.readAsDataURL(file);
         });
 
+        // This triggers only AFTER both images have actively loaded in the background
         userImage.onload = () => {
-            // Clear canvas
+            // Clear previous canvases
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // 1. Draw User Image (scaled to cover the 1500x1500 square)
+            // LAYER 1: Draw the User Photo First (At the bottom)
             let minDim = Math.min(userImage.width, userImage.height);
             let sx = (userImage.width - minDim) / 2;
             let sy = (userImage.height - minDim) / 2;
             ctx.drawImage(userImage, sx, sy, minDim, minDim, 0, 0, canvas.width, canvas.height);
             
-            // 2. Overlay the Frame
+            // LAYER 2: Overlay the Border Frame (On top)
             ctx.drawImage(frameImage, 0, 0, canvas.width, canvas.height);
             
             container.style.display = 'block';
