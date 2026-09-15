@@ -23,7 +23,7 @@
 
     <div class="container">
         <h2>Profile Picture Frame Studio</h2>
-        <p>Upload your frame template first, then add your profile picture to position it perfectly inside the circle.</p>
+        <p>Upload the frame layout first, then your photo. Use the adjustment sliders below to align your photo perfectly inside the circle window.</p>
 
         <div class="upload-box">
             <label for="frame-input">Step 1: Upload Your Frame Template Graphic</label>
@@ -31,14 +31,14 @@
         </div>
 
         <div class="upload-box">
-            <label for="user-input">Step 2: Upload Your Face Profile Photo</label>
+            <label for="user-input">Step 2: Upload Your Profile Photo</label>
             <input type="file" id="user-input" accept="image/*">
         </div>
 
         <div class="control-panel" id="controls">
-            <h4 style="margin: 0 0 10px 0; color: #1877f2;">Step 3: Adjust Your Photo Position</h4>
+            <h4 style="margin: 0 0 10px 0; color: #1877f2;">Step 3: Position Your Photo</h4>
             <div class="slider-group">
-                <label for="zoom">Photo Zoom Size:</label>
+                <label for="zoom">Zoom Size:</label>
                 <input type="range" id="zoom" min="0.1" max="4" step="0.01" value="1">
             </div>
             <div class="slider-group">
@@ -76,40 +76,39 @@
         let userReady = false;
 
         frameInput.addEventListener('change', (e) => {
-            const file = e.target.files;
-            if (!file) return;
+            if (!e.target.files[0]) return;
             const reader = new FileReader();
             reader.onload = (event) => {
                 frameImg.onload = () => {
                     frameReady = true;
-                    updateAppDimensions();
+                    checkDimensions();
                 };
                 frameImg.src = event.target.result;
             };
-            reader.readAsDataURL(file);
+            reader.readAsDataURL(e.target.files[0]);
         });
 
         userInput.addEventListener('change', (e) => {
-            const file = e.target.files;
-            if (!file) return;
+            if (!e.target.files[0]) return;
             const reader = new FileReader();
             reader.onload = (event) => {
                 userImg.onload = () => {
                     userReady = true;
-                    updateAppDimensions();
+                    checkDimensions();
                 };
                 userImg.src = event.target.result;
             };
-            reader.readAsDataURL(file);
+            reader.readAsDataURL(e.target.files[0]);
         });
 
-        function updateAppDimensions() {
+        function checkDimensions() {
             if (!frameReady || !userReady) return;
 
+            // Instantly match resolution coordinates to your specific asset width/height
             canvas.width = frameImg.width;
             canvas.height = frameImg.height;
 
-            // Expand limits so you can slide across the entire canvas space
+            // Set responsive slider parameters based on actual file size bounds
             moveXSlider.min = -canvas.width;
             moveXSlider.max = canvas.width;
             moveYSlider.min = -canvas.height;
@@ -117,56 +116,58 @@
 
             controls.style.display = 'block';
             container.style.display = 'block';
-            draw();
+            processImageLayers();
         }
 
-        [zoomSlider, moveXSlider, moveYSlider].forEach(input => {
-            input.addEventListener('input', draw);
+        [zoomSlider, moveXSlider, moveYSlider].forEach(slider => {
+            slider.addEventListener('input', processImageLayers);
         });
 
-        function draw() {
+        function processImageLayers() {
             if (!frameReady || !userReady) return;
 
+            // Clear historical canvas frame runs
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // TARGET MATCHING: Exact pixel coordinates of the white circle cutout
-            const targetX = 746;
-            const targetY = 605;
-            const holeRadius = 290; 
+            // EXACT MATCH CORRECTION: Target vector alignment mapping for your circle window area
+            const holeX = canvas.width * 0.498; 
+            const holeY = canvas.height * 0.403;
+            const holeRadius = canvas.width * 0.194;
 
             const scale = parseFloat(zoomSlider.value);
-            const offsetX = parseInt(moveXSlider.value);
-            const offsetY = parseInt(moveYSlider.value);
+            const slideX = parseInt(moveXSlider.value);
+            const slideY = parseInt(moveYSlider.value);
 
-            let minDim = Math.min(userImg.width, userImg.height);
-            let displaySize = holeRadius * 2 * scale;
-
-            // 1. Lock the photo boundary specifically inside the white template circle
+            // Step 1: Draw the base personal profile picture cropped perfectly to a circular mask shape
             ctx.save();
             ctx.beginPath();
-            ctx.arc(targetX, targetY, holeRadius, 0, Math.PI * 2);
+            ctx.arc(holeX, holeY, holeRadius, 0, Math.PI * 2);
             ctx.clip();
-            
-            // Draw photo relative to the circle center + your slider offsets
-            let dx = (targetX - (displaySize / 2)) + offsetX;
-            let dy = (targetY - (displaySize / 2)) + offsetY;
-            ctx.drawImage(userImg, (userImg.width - minDim)/2, (userImg.height - minDim)/2, minDim, minDim, dx, dy, displaySize, displaySize);
+
+            let squareDim = Math.min(userImg.width, userImg.height);
+            let scaleTarget = holeRadius * 2 * scale;
+            let targetPosX = (holeX - (scaleTarget / 2)) + slideX;
+            let targetPosY = (holeY - (scaleTarget / 2)) + slideY;
+
+            ctx.drawImage(userImg, (userImg.width - squareDim) / 2, (userImg.height - squareDim) / 2, squareDim, squareDim, targetPosX, targetPosY, scaleTarget, scaleTarget);
             ctx.restore();
 
-            // 2. Punch a clean hole through the white template image circle dynamically
-            let offscreen = document.createElement('canvas');
-            offscreen.width = canvas.width;
-            offscreen.height = canvas.height;
-            let oCtx = offscreen.getContext('2d');
-            
-            oCtx.drawImage(frameImg, 0, 0, canvas.width, canvas.height);
-            oCtx.globalCompositeOperation = 'destination-out';
-            oCtx.beginPath();
-            oCtx.arc(targetX, targetY, holeRadius - 2, 0, Math.PI * 2); 
-            oCtx.fill();
+            // Step 2: Render background graphic artwork layer over an offscreen filter canvas to punch the solid white hole out
+            let compositeCanvas = document.createElement('canvas');
+            compositeCanvas.width = canvas.width;
+            compositeCanvas.height = canvas.height;
+            let compCtx = compositeCanvas.getContext('2d');
 
-            // 3. Drop the cutout frame template directly on top
-            ctx.drawImage(offscreen, 0, 0, canvas.width, canvas.height);
+            compCtx.drawImage(frameImg, 0, 0, canvas.width, canvas.height);
+            
+            // Apply blend subtraction to punch a physical hole through the solid white background image circles
+            compCtx.globalCompositeOperation = 'destination-out';
+            compCtx.beginPath();
+            compCtx.arc(holeX, holeY, holeRadius - 1, 0, Math.PI * 2);
+            compCtx.fill();
+
+            // Step 3: Draw the finalized frame cutout image cleanly directly over your aligned photo layer
+            ctx.drawImage(compositeCanvas, 0, 0, canvas.width, canvas.height);
         }
 
         downloadBtn.addEventListener('click', () => {
