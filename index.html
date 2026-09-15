@@ -26,56 +26,83 @@
     </div>
 
     <script>
-        const upload = document.getElementById('upload');
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const container = document.getElementById('canvas-container');
-        const downloadBtn = document.getElementById('download-btn');
+    const upload = document.getElementById('upload');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('canvas-container');
+    const downloadBtn = document.getElementById('download-btn');
 
-        // IMPORTANT: Change this to match your EXACT filename case on GitHub
-        const FRAME_SRC = 'frame.png'; 
+    // IMPORTANT: Change this to match your EXACT filename case on GitHub
+    const FRAME_SRC = 'frame.png'; 
 
-        let userImage = new Image();
-        let frameImage = new Image();
-        
-        // Handle potential local cross-origin issues
-        frameImage.crossOrigin = "anonymous";
-        frameImage.src = FRAME_SRC;
+    let userImage = new Image();
+    let frameImage = new Image();
+    
+    frameImage.crossOrigin = "anonymous";
+    frameImage.src = FRAME_SRC;
 
-        upload.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
+    upload.addEventListener('change', (e) => {
+        const file = e.target.files;
+        if (!file) return;
 
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                userImage.src = event.target.result;
-            };
-            reader.readAsDataURL(file);
-        });
-
-        // This triggers only AFTER both images have actively loaded in the background
-        userImage.onload = () => {
-            // Clear previous canvases
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // LAYER 1: Draw the User Photo First (At the bottom)
-            let minDim = Math.min(userImage.width, userImage.height);
-            let sx = (userImage.width - minDim) / 2;
-            let sy = (userImage.height - minDim) / 2;
-            ctx.drawImage(userImage, sx, sy, minDim, minDim, 0, 0, canvas.width, canvas.height);
-            
-            // LAYER 2: Overlay the Border Frame (On top)
-            ctx.drawImage(frameImage, 0, 0, canvas.width, canvas.height);
-            
-            container.style.display = 'block';
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            userImage.src = event.target.result;
         };
+        reader.readAsDataURL(file);
+    });
 
-        downloadBtn.addEventListener('click', () => {
-            const link = document.createElement('a');
-            link.download = 'framed-profile-pic.png';
-            link.href = canvas.toDataURL('image/png');
-            link.click();
-        });
-    </script>
+    userImage.onload = () => {
+        // Clear canvas completely
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // 1. Draw the user photo scaled across the canvas first
+        let minDim = Math.min(userImage.width, userImage.height);
+        let sx = (userImage.width - minDim) / 2;
+        let sy = (userImage.height - minDim) / 2;
+        ctx.drawImage(userImage, sx, sy, minDim, minDim, 0, 0, canvas.width, canvas.height);
+        
+        // 2. Clear out the middle circle using a transparent mask
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.beginPath();
+        // Exact center coordinates and radius calculated for your specific template circle
+        ctx.arc(672, 792, 360, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // 3. Draw the frame image, then quickly swap the user picture back underneath the frame hole
+        let frameCanvas = document.createElement('canvas');
+        frameCanvas.width = canvas.width;
+        frameCanvas.height = canvas.height;
+        let fCtx = frameCanvas.getContext('2d');
+        
+        // Build the cut-out frame layer dynamically
+        fCtx.drawImage(frameImage, 0, 0, canvas.width, canvas.height);
+        fCtx.globalCompositeOperation = 'destination-out';
+        fCtx.beginPath();
+        fCtx.arc(672, 792, 350, 0, Math.PI * 2); // Creates a clear window through the white area
+        fCtx.fill();
+        
+        // Re-render everything in the right visual order
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Base layer: User Photo
+        ctx.drawImage(userImage, sx, sy, minDim, minDim, 280, 400, 780, 780);
+        
+        // Top layer: Cutout Frame
+        ctx.drawImage(frameImage, 0, 0, canvas.width, canvas.height);
+        
+        container.style.display = 'block';
+    };
+
+    downloadBtn.addEventListener('click', () => {
+        const link = document.createElement('a');
+        link.download = 'framed-profile-pic.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    });
+</script>
+    
 </body>
 </html>
