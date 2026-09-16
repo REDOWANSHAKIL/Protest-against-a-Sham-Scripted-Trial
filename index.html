@@ -23,7 +23,7 @@
 
     <div class="container">
         <h2>Profile Picture Frame Studio</h2>
-        <p>Upload the frame layout first, then your photo. Use the adjustment sliders below to align your photo perfectly inside the circle window.</p>
+        <p>Upload the frame layout first, then your photo. Use the adjustment sliders to scale and slide your photo smoothly into the center hole.</p>
 
         <div class="upload-box">
             <label for="frame-input">Step 1: Upload Your Frame Template Graphic</label>
@@ -38,16 +38,17 @@
         <div class="control-panel" id="controls">
             <h4 style="margin: 0 0 10px 0; color: #1877f2;">Step 3: Position Your Photo</h4>
             <div class="slider-group">
-                <label for="zoom">Zoom Size:</label>
-                <input type="range" id="zoom" min="0.1" max="4" step="0.01" value="1">
+                <label for="zoom">Photo Size (Zoom):</label>
+                <!-- Expanded zoom controls range so you can stretch the photo to cover all borders -->
+                <input type="range" id="zoom" min="0.1" max="6" step="0.01" value="1.5">
             </div>
             <div class="slider-group">
                 <label for="moveX">Move Left / Right:</label>
-                <input type="range" id="moveX" min="-1000" max="1000" step="1" value="0">
+                <input type="range" id="moveX" min="-2000" max="2000" step="1" value="0">
             </div>
             <div class="slider-group">
                 <label for="moveY">Move Up / Down:</label>
-                <input type="range" id="moveY" min="-1000" max="1000" step="1" value="0">
+                <input type="range" id="moveY" min="-2000" max="2000" step="1" value="0">
             </div>
         </div>
 
@@ -76,7 +77,7 @@
         let userReady = false;
 
         frameInput.addEventListener('change', (e) => {
-            if (!e.target.files[0]) return;
+            if (!e.target.files.length) return;
             const reader = new FileReader();
             reader.onload = (event) => {
                 frameImg.onload = () => {
@@ -85,11 +86,11 @@
                 };
                 frameImg.src = event.target.result;
             };
-            reader.readAsDataURL(e.target.files[0]);
+            reader.readAsDataURL(e.target.files);
         });
 
         userInput.addEventListener('change', (e) => {
-            if (!e.target.files[0]) return;
+            if (!e.target.files.length) return;
             const reader = new FileReader();
             reader.onload = (event) => {
                 userImg.onload = () => {
@@ -98,17 +99,17 @@
                 };
                 userImg.src = event.target.result;
             };
-            reader.readAsDataURL(e.target.files[0]);
+            reader.readAsDataURL(e.target.files);
         });
 
         function checkDimensions() {
             if (!frameReady || !userReady) return;
 
-            // Instantly match resolution coordinates to your specific asset width/height
+            // Set canvas pixel dimensions to exactly match the target layout structure
             canvas.width = frameImg.width;
             canvas.height = frameImg.height;
 
-            // Set responsive slider parameters based on actual file size bounds
+            // Set slide bounds to cover the entire resolution boundary seamlessly
             moveXSlider.min = -canvas.width;
             moveXSlider.max = canvas.width;
             moveYSlider.min = -canvas.height;
@@ -116,20 +117,19 @@
 
             controls.style.display = 'block';
             container.style.display = 'block';
-            processImageLayers();
+            processLayers();
         }
 
         [zoomSlider, moveXSlider, moveYSlider].forEach(slider => {
-            slider.addEventListener('input', processImageLayers);
+            slider.addEventListener('input', processLayers);
         });
 
-        function processImageLayers() {
+        function processLayers() {
             if (!frameReady || !userReady) return;
 
-            // Clear historical canvas frame runs
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // EXACT MATCH CORRECTION: Target vector alignment mapping for your circle window area
+            // True center coordinate tracking variables for your frame opening
             const holeX = canvas.width * 0.498; 
             const holeY = canvas.height * 0.403;
             const holeRadius = canvas.width * 0.194;
@@ -138,36 +138,227 @@
             const slideX = parseInt(moveXSlider.value);
             const slideY = parseInt(moveYSlider.value);
 
-            // Step 1: Draw the base personal profile picture cropped perfectly to a circular mask shape
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(holeX, holeY, holeRadius, 0, Math.PI * 2);
-            ctx.clip();
+            // DYNAMIC FIX: Proportional aspect ratio handling to scale user images smoothly
+            let userAspectRatio = userImg.width / userImg.height;
+            let targetWidth, targetHeight;
 
-            let squareDim = Math.min(userImg.width, userImg.height);
-            let scaleTarget = holeRadius * 2 * scale;
-            let targetPosX = (holeX - (scaleTarget / 2)) + slideX;
-            let targetPosY = (holeY - (scaleTarget / 2)) + slideY;
-
-            ctx.drawImage(userImg, (userImg.width - squareDim) / 2, (userImg.height - squareDim) / 2, squareDim, squareDim, targetPosX, targetPosY, scaleTarget, scaleTarget);
-            ctx.restore();
-
-            // Step 2: Render background graphic artwork layer over an offscreen filter canvas to punch the solid white hole out
-            let compositeCanvas = document.createElement('canvas');
-            compositeCanvas.width = canvas.width;
-            compositeCanvas.height = canvas.height;
-            let compCtx = compositeCanvas.getContext('2d');
-
-            compCtx.drawImage(frameImg, 0, 0, canvas.width, canvas.height);
+            if (userAspectRatio > 1) {
+                targetHeight = (holeRadius * 2) * scale;
+                targetWidth = targetHeight * userAspectRatio;
+            } else {
+                targetWidth = (holeRadius * 2) * scale;
+                targetHeight = targetWidth / userAspectRatio;
+            }
             
-            // Apply blend subtraction to punch a physical hole through the solid white background image circles
-            compCtx.globalCompositeOperation = 'destination-out';
-            compCtx.beginPath();
-            compCtx.arc(holeX, holeY, holeRadius - 1, 0, Math.PI * 2);
-            compCtx.fill();
+            // Align base center coordinates directly over the opening layer bounds
+            let targetPosX = holeX - (targetWidth / 2) + slideX;
+            let targetPosY = holeY - (targetHeight / 2) + slideY;
 
-            // Step 3: Draw the finalized frame cutout image cleanly directly over your aligned photo layer
-            ctx.drawImage(compositeCanvas, 0, 0, canvas.width, canvas.height);
+            // LAYER 1: Draw the base image freely underneath without hard boundaries cutting the left edge off
+            ctx.drawImage(userImg, 0, 0, userImg.width, userImg.height, targetPosX, targetPosY, targetWidth, targetHeight);
+
+            // LAYER 2: Separate buffer mask processing to knock out the white space region cleanly
+            let filterCanvas = document.createElement('canvas');
+            filterCanvas.width = canvas.width;
+            filterCanvas.height = canvas.height;
+            let fCtx = filterCanvas.getContext('2d');
+
+            fCtx.drawImage(frameImg, 0, 0, canvas.width, canvas.height);
+            
+            // Apply clipping erasure to clear out the solid circle background template block
+            fCtx.globalCompositeOperation = 'destination-out';
+            fCtx.beginPath();
+            fCtx.arc(holeX, holeY, holeRadius - 1, 0, Math.PI * 2);
+            fCtx.fill();
+
+            // LAYER 3: Render processed layout layer neatly on top of the user photo layer
+            ctx.drawImage(filterCanvas, 0, 0, canvas.width, canvas.height);
+        }
+
+        downloadBtn.addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = 'framed-profile-pic.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        });
+    </script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile Picture Frame Studio</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 20px; background: #f0f2f5; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .upload-box { margin: 15px 0; padding: 15px; background: #fafafa; border: 2px dashed #ccd0d5; border-radius: 8px; text-align: left; }
+        .upload-box label { display: block; font-weight: bold; margin-bottom: 8px; color: #1c1e21; }
+        .control-panel { margin: 20px 0; background: #f0f2f5; padding: 15px; border-radius: 8px; text-align: left; display: none; }
+        .slider-group { margin: 12px 0; display: flex; align-items: center; justify-content: space-between; }
+        .slider-group label { font-weight: bold; width: 35%; font-size: 14px; }
+        .slider-group input { width: 60%; }
+        #canvas-container { margin: 20px auto; max-width: 450px; display: none; }
+        canvas { width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); background: #fff; }
+        .btn { background: #1877f2; color: white; padding: 12px 24px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 15px; width: 100%; }
+        .btn:hover { background: #166fe5; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>Profile Picture Frame Studio</h2>
+        <p>Upload the frame layout first, then your photo. Use the adjustment sliders to scale and slide your photo smoothly into the center hole.</p>
+
+        <div class="upload-box">
+            <label for="frame-input">Step 1: Upload Your Frame Template Graphic</label>
+            <input type="file" id="frame-input" accept="image/*">
+        </div>
+
+        <div class="upload-box">
+            <label for="user-input">Step 2: Upload Your Profile Photo</label>
+            <input type="file" id="user-input" accept="image/*">
+        </div>
+
+        <div class="control-panel" id="controls">
+            <h4 style="margin: 0 0 10px 0; color: #1877f2;">Step 3: Position Your Photo</h4>
+            <div class="slider-group">
+                <label for="zoom">Photo Size (Zoom):</label>
+                <!-- Expanded zoom controls range so you can stretch the photo to cover all borders -->
+                <input type="range" id="zoom" min="0.1" max="6" step="0.01" value="1.5">
+            </div>
+            <div class="slider-group">
+                <label for="moveX">Move Left / Right:</label>
+                <input type="range" id="moveX" min="-2000" max="2000" step="1" value="0">
+            </div>
+            <div class="slider-group">
+                <label for="moveY">Move Up / Down:</label>
+                <input type="range" id="moveY" min="-2000" max="2000" step="1" value="0">
+            </div>
+        </div>
+
+        <div id="canvas-container">
+            <canvas id="canvas"></canvas>
+            <button class="btn" id="download-btn">Download Framed Photo</button>
+        </div>
+    </div>
+
+    <script>
+        const frameInput = document.getElementById('frame-input');
+        const userInput = document.getElementById('user-input');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const controls = document.getElementById('controls');
+        const container = document.getElementById('canvas-container');
+        const downloadBtn = document.getElementById('download-btn');
+
+        const zoomSlider = document.getElementById('zoom');
+        const moveXSlider = document.getElementById('moveX');
+        const moveYSlider = document.getElementById('moveY');
+
+        let frameImg = new Image();
+        let userImg = new Image();
+        let frameReady = false;
+        let userReady = false;
+
+        frameInput.addEventListener('change', (e) => {
+            if (!e.target.files.length) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                frameImg.onload = () => {
+                    frameReady = true;
+                    checkDimensions();
+                };
+                frameImg.src = event.target.result;
+            };
+            reader.readAsDataURL(e.target.files);
+        });
+
+        userInput.addEventListener('change', (e) => {
+            if (!e.target.files.length) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                userImg.onload = () => {
+                    userReady = true;
+                    checkDimensions();
+                };
+                userImg.src = event.target.result;
+            };
+            reader.readAsDataURL(e.target.files);
+        });
+
+        function checkDimensions() {
+            if (!frameReady || !userReady) return;
+
+            // Set canvas pixel dimensions to exactly match the target layout structure
+            canvas.width = frameImg.width;
+            canvas.height = frameImg.height;
+
+            // Set slide bounds to cover the entire resolution boundary seamlessly
+            moveXSlider.min = -canvas.width;
+            moveXSlider.max = canvas.width;
+            moveYSlider.min = -canvas.height;
+            moveYSlider.max = canvas.height;
+
+            controls.style.display = 'block';
+            container.style.display = 'block';
+            processLayers();
+        }
+
+        [zoomSlider, moveXSlider, moveYSlider].forEach(slider => {
+            slider.addEventListener('input', processLayers);
+        });
+
+        function processLayers() {
+            if (!frameReady || !userReady) return;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // True center coordinate tracking variables for your frame opening
+            const holeX = canvas.width * 0.498; 
+            const holeY = canvas.height * 0.403;
+            const holeRadius = canvas.width * 0.194;
+
+            const scale = parseFloat(zoomSlider.value);
+            const slideX = parseInt(moveXSlider.value);
+            const slideY = parseInt(moveYSlider.value);
+
+            // DYNAMIC FIX: Proportional aspect ratio handling to scale user images smoothly
+            let userAspectRatio = userImg.width / userImg.height;
+            let targetWidth, targetHeight;
+
+            if (userAspectRatio > 1) {
+                targetHeight = (holeRadius * 2) * scale;
+                targetWidth = targetHeight * userAspectRatio;
+            } else {
+                targetWidth = (holeRadius * 2) * scale;
+                targetHeight = targetWidth / userAspectRatio;
+            }
+            
+            // Align base center coordinates directly over the opening layer bounds
+            let targetPosX = holeX - (targetWidth / 2) + slideX;
+            let targetPosY = holeY - (targetHeight / 2) + slideY;
+
+            // LAYER 1: Draw the base image freely underneath without hard boundaries cutting the left edge off
+            ctx.drawImage(userImg, 0, 0, userImg.width, userImg.height, targetPosX, targetPosY, targetWidth, targetHeight);
+
+            // LAYER 2: Separate buffer mask processing to knock out the white space region cleanly
+            let filterCanvas = document.createElement('canvas');
+            filterCanvas.width = canvas.width;
+            filterCanvas.height = canvas.height;
+            let fCtx = filterCanvas.getContext('2d');
+
+            fCtx.drawImage(frameImg, 0, 0, canvas.width, canvas.height);
+            
+            // Apply clipping erasure to clear out the solid circle background template block
+            fCtx.globalCompositeOperation = 'destination-out';
+            fCtx.beginPath();
+            fCtx.arc(holeX, holeY, holeRadius - 1, 0, Math.PI * 2);
+            fCtx.fill();
+
+            // LAYER 3: Render processed layout layer neatly on top of the user photo layer
+            ctx.drawImage(filterCanvas, 0, 0, canvas.width, canvas.height);
         }
 
         downloadBtn.addEventListener('click', () => {
